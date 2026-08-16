@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Botanical Lily Bloom</title>
+    <style>
+        /* ==========================================
+           RESET & CONTAINER LAYOUT
+           ========================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030406;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Fullscreen Canvas for ambient particles */
+        #particleCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* SVG Container */
+        .svg-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1000px;
+            max-height: 1000px;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* Click to replay overlay trigger */
+        .replay-trigger {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        /* Hint text */
+        .hint {
+            position: absolute;
+            bottom: 24px;
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            pointer-events: none;
+            z-index: 5;
+            transition: opacity 1s ease;
+        }
+
+        /* ==========================================
+           ANIMATION KEYFRAMES & STYLES
+           ========================================== */
+
+        /* Master Sways (After Bloom Ambient Motion) */
+        .master-sway {
+            transform-origin: 500px 950px;
+            animation: masterSway 12s ease-in-out infinite alternate;
+            animation-delay: 11s;
+        }
+
+        @keyframes masterSway {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(1.2deg); }
+        }
+
+        .flower-head-sway {
+            transform-origin: 500px 420px;
+            animation: headSway 9s ease-in-out infinite alternate;
+            animation-delay: 11s;
+        }
+
+        @keyframes headSway {
+            0% { transform: rotate(0deg) translate(0, 0); }
+            50% { transform: rotate(-1.5deg) translate(-2px, 1px); }
+            100% { transform: rotate(1deg) translate(1px, -1px); }
+        }
+
+        /* --- STAGE 1: STEM GROW --- */
+        .stem-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: growStem 2.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+        }
+
+        @keyframes growStem {
+            0% { stroke-dashoffset: 1000; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        /* --- STAGE 2: LEAVES --- */
+        .leaf {
+            opacity: 0;
+            transform-box: fill-box;
+            animation: emergeLeaf 2.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .leaf-left-1 {
+            transform-origin: right bottom;
+            animation-delay: 2.0s;
+        }
+
+        .leaf-right-1 {
+            transform-origin: left bottom;
+            animation-delay: 2.6s;
+        }
+
+        .leaf-left-2 {
+            transform-origin: right bottom;
+            animation-delay: 3.2s;
+        }
+
+        @keyframes emergeLeaf {
+            0% {
+                opacity: 0;
+                transform: scale(0.1) rotate(-20deg);
+            }
+            60% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+        }
+
+        /* Leaf Idle Sway */
+        .leaf-left-1 .leaf-inner {
+            animation: leafSwayL 8s ease-in-out infinite alternate;
+            animation-delay: 11s;
+            transform-origin: right bottom;
+        }
+        .leaf-right-1 .leaf-inner {
+            animation: leafSwayR 7s ease-in-out infinite alternate;
+            animation-delay: 11s;
+            transform-origin: left bottom;
+        }
+
+        @keyframes leafSwayL {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(-3deg); }
+        }
+        @keyframes leafSwayR {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(3.5deg); }
+        }
+
+        /* --- STAGE 3: BUD --- */
+        .bud-group {
+            transform-origin: 500px 420px;
+            animation: budRise 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+                       budTransform 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            animation-delay: 3.2s, 5.2s;
+        }
+
+        @keyframes budRise {
+            0% {
+                opacity: 0;
+                transform: scale(0.2) translate(0, 50px);
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translate(0, 0);
+            }
+        }
+
+        @keyframes budTransform {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.1); pointer-events: none; }
+        }
+
+        /* --- STAGE 4: PETALS BLOOM --- */
+        .petal {
+            opacity: 0;
+            transform-origin: 500px 430px;
+            animation: bloomPetal 3.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Bloom Sequence & Staggering */
+        /* Outer Back Petals */
+        .petal-back-left { animation-delay: 5.2s; --rot-dest: -38deg; --scale-dest: 1; }
+        .petal-back-right { animation-delay: 5.4s; --rot-dest: 35deg; --scale-dest: 1; }
+        .petal-back-top { animation-delay: 5.7s; --rot-dest: -2deg; --scale-dest: 1.02; }
+
+        /* Inner Front Petals */
+        .petal-front-left { animation-delay: 6.1s; --rot-dest: -68deg; --scale-dest: 1.05; }
+        .petal-front-right { animation-delay: 6.4s; --rot-dest: 62deg; --scale-dest: 1.03; }
+        .petal-front-bottom { animation-delay: 6.8s; --rot-dest: 5deg; --scale-dest: 1.08; }
+
+        @keyframes bloomPetal {
+            0% {
+                opacity: 0;
+                transform: rotate(0deg) scale(0.2, 0.5);
+            }
+            30% {
+                opacity: 1;
+            }
+            85% {
+                transform: rotate(calc(var(--rot-dest) * 1.04)) scale(var(--scale-dest));
+            }
+            100% {
+                opacity: 1;
+                transform: rotate(var(--rot-dest)) scale(var(--scale-dest));
+            }
+        }
+
+        /* Individual Petal Gentle Continuous Breathing */
+        .petal-inner-wrap {
+            transform-origin: 500px 430px;
+            animation: petalBreathe 8s ease-in-out infinite alternate;
+            animation-delay: 11s;
+        }
+
+        .petal-back-left .petal-inner-wrap { animation-delay: 11.2s; }
+        .petal-back-right .petal-inner-wrap { animation-delay: 11.6s; }
+        .petal-front-left .petal-inner-wrap { animation-delay: 12.0s; }
+        .petal-front-right .petal-inner-wrap { animation-delay: 12.4s; }
+
+        @keyframes petalBreathe {
+            0% { transform: rotate(0deg) scale(1); }
+            100% { transform: rotate(1.5deg) scale(1.015); }
+        }
+
+        /* --- STAGE 5: REPRODUCTIVE ORGANS --- */
+        .stamen {
+            opacity: 0;
+            transform-origin: 500px 430px;
+            animation: emergeStamen 2.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .stamen-1 { animation-delay: 8.8s; --s-rot: -28deg; }
+        .stamen-2 { animation-delay: 9.0s; --s-rot: -14deg; }
+        .stamen-3 { animation-delay: 9.1s; --s-rot: 2deg; }
+        .stamen-4 { animation-delay: 9.3s; --s-rot: 18deg; }
+        .stamen-5 { animation-delay: 9.5s; --s-rot: 32deg; }
+
+        @keyframes emergeStamen {
+            0% {
+                opacity: 0;
+                transform: rotate(0deg) scale(0.2);
+            }
+            100% {
+                opacity: 1;
+                transform: rotate(var(--s-rot)) scale(1);
+            }
+        }
+
+        .pistil {
+            opacity: 0;
+            transform-origin: 500px 430px;
+            animation: emergePistil 2.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+            animation-delay: 9.8s;
+        }
+
+        @keyframes emergePistil {
+            0% {
+                opacity: 0;
+                transform: scale(0.3) rotate(-5deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+        }
+
+        /* Central Glow Animation */
+        .center-glow {
+            opacity: 0;
+            animation: glowFade 4s ease-in-out forwards;
+            animation-delay: 7.5s;
+        }
+
+        @keyframes glowFade {
+            0% { opacity: 0; transform: scale(0.5); }
+            100% { opacity: 0.85; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Ambient Floating Dust/Pollen Canvas -->
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- Main Botanical Illustration SVG Container -->
+    <div class="svg-container" id="flowerContainer">
+        <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+            
+            <defs>
+                <!-- ==========================================
+                     GRADIENTS & FILTERS
+                     ========================================== -->
+
+                <!-- Stem Gradient -->
+                <linearGradient id="stemGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#0d2314"/>
+                    <stop offset="35%" stop-color="#1f4e2c"/>
+                    <stop offset="70%" stop-color="#2d6a3f"/>
+                    <stop offset="100%" stop-color="#12331c"/>
+                </linearGradient>
+
+                <!-- Leaf Gradient Main -->
+                <linearGradient id="leafGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#15381e"/>
+                    <stop offset="40%" stop-color="#265c34"/>
+                    <stop offset="80%" stop-color="#1a4224"/>
+                    <stop offset="100%" stop-color="#0a1c0d"/>
+                </linearGradient>
+
+                <linearGradient id="leafGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#2d683d"/>
+                    <stop offset="50%" stop-color="#1d4a2a"/>
+                    <stop offset="100%" stop-color="#0b1e10"/>
+                </linearGradient>
+
+                <!-- Bud Outer Sepal/Petal Gradient -->
+                <linearGradient id="budGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stop-color="#1b4023"/>
+                    <stop offset="30%" stop-color="#3b6940"/>
+                    <stop offset="65%" stop-color="#a44372"/>
+                    <stop offset="90%" stop-color="#d884a6"/>
+                    <stop offset="100%" stop-color="#f5e6ed"/>
+                </linearGradient>
+
+                <!-- Petal Shading Gradients (Multi-layered realistic lily tone) -->
+                <!-- Base Petal Body: White center to intense magenta/pink edges -->
+                <radialGradient id="petalBodyGrad" cx="50%" cy="85%" r="85%">
+                    <stop offset="0%" stop-color="#fff8fa"/>
+                    <stop offset="25%" stop-color="#ffedf3"/>
+                    <stop offset="55%" stop-color="#fca5c7"/>
+                    <stop offset="82%" stop-color="#cf3b7a"/>
+                    <stop offset="96%" stop-color="#931b4e"/>
+                    <stop offset="100%" stop-color="#610c31"/>
+                </radialGradient>
+
+                <!-- Petal Back/Shadowed Body Gradient -->
+                <radialGradient id="petalBackGrad" cx="50%" cy="90%" r="85%">
+                    <stop offset="0%" stop-color="#fae6ee"/>
+                    <stop offset="35%" stop-color="#f48fb9"/>
+                    <stop offset="70%" stop-color="#b82d67"/>
+                    <stop offset="95%" stop-color="#78133e"/>
+                    <stop offset="100%" stop-color="#4a0824"/>
+                </radialGradient>
+
+                <!-- Petal Base Greenish Warmth -->
+                <radialGradient id="petalBaseGreen" cx="50%" cy="100%" r="35%">
+                    <stop offset="0%" stop-color="#b6e36d" stop-opacity="0.9"/>
+                    <stop offset="40%" stop-color="#6cb843" stop-opacity="0.6"/>
+                    <stop offset="80%" stop-color="#34782a" stop-opacity="0.1"/>
+                    <stop offset="100%" stop-color="#1e4d18" stop-opacity="0"/>
+                </radialGradient>
+
+                <!-- Filament/Stamen Gradient -->
+                <linearGradient id="stamenGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stop-color="#92c447"/>
+                    <stop offset="60%" stop-color="#e2f5b8"/>
+                    <stop offset="100%" stop-color="#ffffff"/>
+                </linearGradient>
+
+                <!-- Anther Pollen Gradient -->
+                <radialGradient id="antherGrad" cx="40%" cy="40%" r="60%">
+                    <stop offset="0%" stop-color="#ffc83b"/>
+                    <stop offset="40%" stop-color="#d47a17"/>
+                    <stop offset="85%" stop-color="#7a3406"/>
+                    <stop offset="100%" stop-color="#421a02"/>
+                </radialGradient>
+
+                <!-- Pistil Stigma Gradient -->
+                <radialGradient id="stigmaGrad" cx="35%" cy="35%" r="65%">
+                    <stop offset="0%" stop-color="#7fa644"/>
+                    <stop offset="60%" stop-color="#41611d"/>
+                    <stop offset="100%" stop-color="#1d300a"/>
+                </radialGradient>
+
+                <!-- Soft Center Glow Filter -->
+                <radialGradient id="centerGlowSrc" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#ffe699" stop-opacity="0.5"/>
+                    <stop offset="40%" stop-color="#f080a8" stop-opacity="0.25"/>
+                    <stop offset="80%" stop-color="#6b1138" stop-opacity="0.08"/>
+                    <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+                </radialGradient>
+
+                <!-- Subtle Soft Drop Shadows for Overlapping Petals -->
+                <filter id="shadowFilter" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+                    <feOffset dx="2" dy="8" result="offsetblur"/>
+                    <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.4"/>
+                    </feComponentTransfer>
+                    <feMerge> 
+                        <feMergeNode/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+
+                <!-- Soft Glow Filter for Flower Backing -->
+                <filter id="ambientGlow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="15" result="blur"/>
+                    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                </filter>
+
+                <!-- Speckle Pattern Mask for Petal Base Dots -->
+                <pattern id="specklePattern" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+                    <circle cx="20" cy="30" r="1.2" fill="#54041b" opacity="0.85"/>
+                    <circle cx="35" cy="15" r="0.9" fill="#3d0112" opacity="0.7"/>
+                    <circle cx="45" cy="45" r="1.4" fill="#610521" opacity="0.9"/>
+                    <circle cx="65" cy="25" r="1.1" fill="#470214" opacity="0.8"/>
+                    <circle cx="80" cy="50" r="0.8" fill="#36010d" opacity="0.65"/>
+                    <circle cx="28" cy="65" r="1.3" fill="#5e0420" opacity="0.85"/>
+                    <circle cx="52" cy="75" r="1.0" fill="#420214" opacity="0.75"/>
+                    <circle cx="72" cy="70" r="1.5" fill="#6b0625" opacity="0.9"/>
+                </pattern>
+            </defs>
+
+            <!-- MASTER SWAY GROUP -->
+            <g class="master-sway">
+                
+                <!-- ==========================================
+                     STAGE 1: MAIN STEM
+                     ========================================== -->
+                <g id="stem-group">
+                    <!-- Stem Base Soft Glow -->
+                    <path d="M 500 960 Q 495 750 505 600 T 500 430" 
+                          fill="none" stroke="#1d4d29" stroke-width="14" opacity="0.15" filter="url(#ambientGlow)" />
+                    
+                    <!-- Primary Organic Tapered Stem -->
+                    <path class="stem-path" d="M 500 960 Q 495 750 505 600 T 500 430" 
+                          fill="none" stroke="url(#stemGrad)" stroke-width="8.5" stroke-linecap="round"/>
+
+                    <!-- Stem Highlight Line for 3D Tubular Contour -->
+                    <path class="stem-path" d="M 498 960 Q 493 750 503 600 T 498 430" 
+                          fill="none" stroke="#4c8a5a" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+                </g>
+
+                <!-- ==========================================
+                     STAGE 2: LEAVES
+                     ========================================== -->
+                <g id="leaves-group">
+                    
+                    <!-- Leaf 1: Lower Left -->
+                    <g class="leaf leaf-left-1">
+                        <g class="leaf-inner">
+                            <!-- Leaf Shadow -->
+                            <path d="M 498 780 C 430 770 340 800 270 840 C 340 860 440 840 496 786 Z" fill="#030a04" opacity="0.5"/>
+                            <!-- Main Body -->
+                            <path d="M 498 780 C 420 760 320 790 250 835 C 330 845 430 820 496 786 Z" fill="url(#leafGrad1)"/>
+                            <!-- Leaf Top Specular -->
+                            <path d="M 498 780 C 420 760 320 790 250 835 C 340 815 425 790 498 780 Z" fill="url(#leafGrad2)" opacity="0.7"/>
+                            <!-- Central Vein -->
+                            <path d="M 498 780 Q 375 795 250 835" fill="none" stroke="#529963" stroke-width="1.2" opacity="0.75"/>
+                            <!-- Secondary Veins -->
+                            <path d="M 450 782 Q 420 795 410 803 M 400 792 Q 370 808 360 816 M 340 807 Q 310 820 300 827" 
+                                  fill="none" stroke="#3b7348" stroke-width="0.6" opacity="0.5"/>
+                        </g>
+                    </g>
+
+                    <!-- Leaf 2: Right Middle -->
+                    <g class="leaf leaf-right-1">
+                        <g class="leaf-inner">
+                            <path d="M 503 680 C 580 660 690 680 770 715 C 680 740 570 730 501 686 Z" fill="#030a04" opacity="0.5"/>
+                            <path d="M 503 680 C 580 660 690 680 770 715 C 680 735 570 720 501 686 Z" fill="url(#leafGrad2)"/>
+                            <path d="M 503 680 C 580 660 690 680 770 715 C 670 695 580 680 503 680 Z" fill="url(#leafGrad1)" opacity="0.6"/>
+                            <!-- Central Vein -->
+                            <path d="M 503 680 Q 635 690 770 715" fill="none" stroke="#529963" stroke-width="1.2" opacity="0.75"/>
+                            <!-- Secondary Veins -->
+                            <path d="M 550 680 Q 580 695 595 702 M 610 689 Q 640 703 655 710 M 670 700 Q 700 711 715 715" 
+                                  fill="none" stroke="#3b7348" stroke-width="0.6" opacity="0.5"/>
+                        </g>
+                    </g>
+
+                    <!-- Leaf 3: Upper Left Small -->
+                    <g class="leaf leaf-left-2">
+                        <g class="leaf-inner">
+                            <path d="M 501 570 C 430 540 340 550 280 575 C 350 595 440 590 499 574 Z" fill="url(#leafGrad1)"/>
+                            <path d="M 501 570 Q 390 555 280 575" fill="none" stroke="#4d8f5d" stroke-width="1" opacity="0.7"/>
+                        </g>
+                    </g>
+
+                </g>
+
+                <!-- ==========================================
+                     FLOWER HEAD GROUP (WITH SWAY)
+                     ========================================== -->
+                <g class="flower-head-sway">
+
+                    <!-- Ambient Soft Center Backlight -->
+                    <circle class="center-glow" cx="500" cy="430" r="180" fill="url(#centerGlowSrc)"/>
+
+                    <!-- ==========================================
+                         STAGE 3: CLOSED BUD (Fades out as bloom occurs)
+                         ========================================== -->
+                    <g class="bud-group" id="bud">
+                        <!-- Bud Shadow -->
+                        <path d="M 500 450 C 470 420 465 340 500 290 C 535 340 530 420 500 450 Z" fill="#050d06" opacity="0.6"/>
+                        <!-- Bud Outer Sepals -->
+                        <path d="M 500 445 C 468 415 460 345 500 295 C 540 345 532 415 500 445 Z" fill="url(#budGrad)"/>
+                        <!-- Bud Overlap Lines & Ridges -->
+                        <path d="M 500 445 C 480 400 482 330 500 295" fill="none" stroke="#25472a" stroke-width="1.5" opacity="0.7"/>
+                        <path d="M 500 445 C 515 390 512 330 500 295" fill="none" stroke="#8c375f" stroke-width="1.2" opacity="0.8"/>
+                        <path d="M 490 440 C 465 380 488 320 500 295" fill="none" stroke="#d48ab0" stroke-width="0.8" opacity="0.6"/>
+                        <!-- Bud Base Receptacle -->
+                        <path d="M 490 440 Q 500 455 510 440 Q 503 460 497 460 Z" fill="#1b4023"/>
+                    </g>
+
+                    <!-- ==========================================
+                         STAGE 4: OPENING PETALS (BLOOM)
+                         ========================================== -->
+                    <g id="open-flower" filter="url(#shadowFilter)">
+                        
+                        <!-- --------------------------------------
+                             LAYER 4A: BACK OUTER PETALS (3 Petals)
+                             -------------------------------------- -->
+                        
+                        <!-- Back Top Petal -->
+                        <g class="petal petal-back-top">
+                            <g class="petal-inner-wrap">
+                                <!-- Base Outer Shape -->
+                                <path d="M 500 430 C 460 320 440 200 495 100 C 510 100 540 200 500 430 Z" fill="url(#petalBackGrad)"/>
+                                <path d="M 500 430 C 465 320 450 200 495 100 C 500 130 525 240 500 430 Z" fill="url(#petalBodyGrad)" opacity="0.85"/>
+                                <!-- Petal Tip Curl Highlight -->
+                                <path d="M 495 100 C 485 120 480 140 490 160 C 500 140 505 115 495 100 Z" fill="#ffffff" opacity="0.4"/>
+                                <!-- Green Base Warmth -->
+                                <path d="M 500 430 C 475 390 475 350 500 320 C 525 350 525 390 500 430 Z" fill="url(#petalBaseGreen)"/>
+                                <!-- Veins -->
+                                <path d="M 500 430 Q 488 270 495 100" fill="none" stroke="#ab245d" stroke-width="1.5" opacity="0.7"/>
+                                <path d="M 500 430 Q 470 300 460 190" fill="none" stroke="#871747" stroke-width="0.8" opacity="0.5"/>
+                                <path d="M 500 430 Q 515 300 520 190" fill="none" stroke="#871747" stroke-width="0.8" opacity="0.5"/>
+                                <!-- Fine Vein Branches -->
+                                <path d="M 492 350 Q 475 320 465 290 M 490 280 Q 475 250 465 220 M 496 360 Q 515 330 525 300" 
+                                      fill="none" stroke="#730e3a" stroke-width="0.5" opacity="0.45"/>
+                            </g>
+                        </g>
+
+                        <!-- Back Left Petal -->
+                        <g class="petal petal-back-left">
+                            <g class="petal-inner-wrap">
+                                <path d="M 500 430 C 410 370 280 300 160 270 C 180 295 290 390 500 430 Z" fill="url(#petalBackGrad)"/>
+                                <path d="M 500 430 C 415 360 290 295 160 270 C 200 305 320 405 500 430 Z" fill="url(#petalBodyGrad)" opacity="0.9"/>
+                                <!-- Petal Tip Back Curl -->
+                                <path d="M 160 270 C 180 270 200 285 210 305 C 190 300 170 290 160 270 Z" fill="#ffa6c9" opacity="0.5"/>
+                                <path d="M 500 430 C 460 400 410 375 380 395 C 430 425 470 430 500 430 Z" fill="url(#petalBaseGreen)"/>
+                                <!-- Veins -->
+                                <path d="M 500 430 Q 330 350 160 270" fill="none" stroke="#b52b65" stroke-width="1.6" opacity="0.75"/>
+                                <path d="M 500 430 Q 345 325 210 230" fill="none" stroke="#871747" stroke-width="0.7" opacity="0.45"/>
+                                <path d="M 500 430 Q 360 380 250 330" fill="none" stroke="#871747" stroke-width="0.7" opacity="0.45"/>
+                            </g>
+                        </g>
+
+                        <!-- Back Right Petal -->
+                        <g class="petal petal-back-right">
+                            <g class="petal-inner-wrap">
+                                <path d="M 500 430 C 590 370 720 300 840 270 C 820 295 710 390 500 430 Z" fill="url(#petalBackGrad)"/>
+                                <path d="M 500 430 C 585 360 710 295 840 270 C 800 305 680 405 500 430 Z" fill="url(#petalBodyGrad)" opacity="0.9"/>
+                                <!-- Petal Tip Back Curl -->
+                                <path d="M 840 270 C 820 270 800 285 790 305 C 810 300 830 290 840 270 Z" fill="#ffa6c9" opacity="0.5"/>
+                                <path d="M 500 430 C 540 400 590 375 620 395 C 570 425 530 430 500 430 Z" fill="url(#petalBaseGreen)"/>
+                                <!-- Veins -->
+                                <path d="M 500 430 Q 670 350 840 270" fill="none" stroke="#b52b65" stroke-width="1.6" opacity="0.75"/>
+                                <path d="M 500 430 Q 655 325 690 230" fill="none" stroke="#871747" stroke-width="0.7" opacity="0.45"/>
+                                <path d="M 500 430 Q 640 380 750 330" fill="none" stroke="#871747" stroke-width="0.7" opacity="0.45"/>
+                            </g>
+                        </g>
+
+
+                        <!-- --------------------------------------
+                             LAYER 4B: FRONT MAIN PETALS (3 Petals)
+                             -------------------------------------- -->
+
+                        <!-- Front Left Petal -->
+                        <g class="petal petal-front-left">
+                            <g class="petal-inner-wrap">
+                                <!-- Main Body -->
+                                <path d="M 500 435 C 400 390 240 380 120 430 C 220 480 370 490 500 435 Z" fill="url(#petalBodyGrad)"/>
+                                <!-- Inner Soft Highlight Ridge -->
+                                <path d="M 500 435 C 410 395 270 390 160 430 C 240 455 370 460 500 435 Z" fill="#ffffff" opacity="0.25"/>
+                                <!-- Translucent Edge Rim -->
+                                <path d="M 120 430 C 230 385 390 395 500 435" fill="none" stroke="#fff0f5" stroke-width="1.2" opacity="0.6"/>
+                                <!-- Green Core Base -->
+                                <path d="M 500 435 C 440 420 380 430 350 445 C 410 465 465 455 500 435 Z" fill="url(#petalBaseGreen)"/>
+                                <!-- Speckles near base -->
+                                <path d="M 500 435 C 430 410 340 420 300 440 C 370 470 450 460 500 435 Z" fill="url(#specklePattern)" clip-path="url(#speckleClip1)"/>
+                                <!-- Veins -->
+                                <path d="M 500 435 Q 310 405 120 430" fill="none" stroke="#c42365" stroke-width="1.8" opacity="0.8"/>
+                                <path d="M 500 435 Q 330 385 180 385" fill="none" stroke="#9e194e" stroke-width="0.8" opacity="0.5"/>
+                                <path d="M 500 435 Q 320 445 190 460" fill="none" stroke="#9e194e" stroke-width="0.8" opacity="0.5"/>
+                                <!-- Delicate Vein Branching -->
+                                <path d="M 430 425 Q 390 405 370 390 M 360 415 Q 320 398 300 388 M 440 435 Q 390 445 370 460" 
+                                      fill="none" stroke="#780d39" stroke-width="0.55" opacity="0.5"/>
+                            </g>
+                        </g>
+
+                        <!-- Front Right Petal -->
+                        <g class="petal petal-front-right">
+                            <g class="petal-inner-wrap">
+                                <path d="M 500 435 C 600 390 760 380 880 430 C 780 480 630 490 500 435 Z" fill="url(#petalBodyGrad)"/>
+                                <path d="M 500 435 C 590 395 730 390 840 430 C 760 455 630 460 500 435 Z" fill="#ffffff" opacity="0.25"/>
+                                <path d="M 880 430 C 770 385 610 395 500 435" fill="none" stroke="#fff0f5" stroke-width="1.2" opacity="0.6"/>
+                                <path d="M 500 435 C 560 420 620 430 650 445 C 590 465 535 455 500 435 Z" fill="url(#petalBaseGreen)"/>
+                                <!-- Veins -->
+                                <path d="M 500 435 Q 690 405 880 430" fill="none" stroke="#c42365" stroke-width="1.8" opacity="0.8"/>
+                                <path d="M 500 435 Q 670 385 820 385" fill="none" stroke="#9e194e" stroke-width="0.8" opacity="0.5"/>
+                                <path d="M 500 435 Q 680 445 810 460" fill="none" stroke="#9e194e" stroke-width="0.8" opacity="0.5"/>
+                                <path d="M 570 425 Q 610 405 630 390 M 640 415 Q 680 398 700 388 M 560 435 Q 610 445 630 460" 
+                                      fill="none" stroke="#780d39" stroke-width="0.55" opacity="0.5"/>
+                            </g>
+                        </g>
+
+                        <!-- Front Bottom Petal (Gracefully Drooping Center Front) -->
+                        <g class="petal petal-front-bottom">
+                            <g class="petal-inner-wrap">
+                                <path d="M 500 430 C 435 500 420 640 485 760 C 515 760 565 640 500 430 Z" fill="url(#petalBodyGrad)"/>
+                                <path d="M 500 430 C 445 500 435 630 485 760 C 495 700 540 580 500 430 Z" fill="#ffffff" opacity="0.3"/>
+                                <!-- Recurved Tip -->
+                                <path d="M 485 760 C 475 730 460 700 480 670 C 500 700 495 740 485 760 Z" fill="#fca5c7" opacity="0.6"/>
+                                <path d="M 500 430 C 470 470 470 510 500 540 C 530 510 530 470 500 430 Z" fill="url(#petalBaseGreen)"/>
+                                <!-- Speckles -->
+                                <circle cx="490" cy="480" r="1.4" fill="#470214" opacity="0.8"/>
+                                <circle cx="512" cy="495" r="1.1" fill="#5e0420" opacity="0.85"/>
+                                <circle cx="482" cy="510" r="1.5" fill="#36010d" opacity="0.75"/>
+                                <circle cx="505" cy="525" r="1.0" fill="#6b0625" opacity="0.9"/>
+                                <circle cx="495" cy="540" r="1.3" fill="#420214" opacity="0.8"/>
+                                <!-- Main Center Vein -->
+                                <path d="M 500 430 Q 470 600 485 760" fill="none" stroke="#bd2261" stroke-width="1.8" opacity="0.8"/>
+                                <path d="M 500 430 Q 445 570 455 680" fill="none" stroke="#871747" stroke-width="0.8" opacity="0.5"/>
+                                <path d="M 500 430 Q 515 570 525 680" fill="none" stroke="#871747" stroke-width="0.8" opacity="0.5"/>
+                            </g>
+                        </g>
+
+                    </g> <!-- End Open Flower Petals Group -->
+
+
+                    <!-- ==========================================
+                         STAGE 5: STAMENS, ANTHERS & PISTIL
+                         ========================================== -->
+                    <g id="reproductory-organs">
+                        
+                        <!-- STAMENS (5 Delicate Curved Filaments) -->
+                        
+                        <!-- Stamen 1: Far Left -->
+                        <g class="stamen stamen-1">
+                            <path d="M 500 430 Q 450 380 390 340" fill="none" stroke="url(#stamenGrad)" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M 500 430 Q 450 380 390 340" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+                            <!-- Anther (Golden-brown T-shaped pollen pod) -->
+                            <g transform="translate(390, 340) rotate(-20)">
+                                <ellipse cx="0" cy="0" rx="14" ry="5" fill="url(#antherGrad)" filter="url(#shadowFilter)"/>
+                                <path d="M -10 0 C -5 -3 5 -3 10 0 C 5 3 -5 3 -10 0 Z" fill="#ffea9f" opacity="0.9"/>
+                                <!-- Pollen Grains Dust -->
+                                <circle cx="-6" cy="-4" r="1" fill="#fff" opacity="0.8"/>
+                                <circle cx="4" cy="4" r="1.2" fill="#ffd54f" opacity="0.9"/>
+                            </g>
+                        </g>
+
+                        <!-- Stamen 2: Mid Left -->
+                        <g class="stamen stamen-2">
+                            <path d="M 500 430 Q 470 360 435 305" fill="none" stroke="url(#stamenGrad)" stroke-width="3.2" stroke-linecap="round"/>
+                            <path d="M 500 430 Q 470 360 435 305" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+                            <g transform="translate(435, 305) rotate(15)">
+                                <ellipse cx="0" cy="0" rx="15" ry="5.5" fill="url(#antherGrad)" filter="url(#shadowFilter)"/>
+                                <path d="M -11 0 C -5 -3.5 5 -3.5 11 0 C 5 3.5 -5 3.5 -11 0 Z" fill="#ffea9f" opacity="0.9"/>
+                                <circle cx="-3" cy="-3" r="1.1" fill="#ffd54f" opacity="0.9"/>
+                                <circle cx="5" cy="3" r="1" fill="#fff" opacity="0.7"/>
+                            </g>
+                        </g>
+
+                        <!-- Stamen 3: Center Top -->
+                        <g class="stamen stamen-3">
+                            <path d="M 500 430 Q 500 340 495 285" fill="none" stroke="url(#stamenGrad)" stroke-width="3.3" stroke-linecap="round"/>
+                            <path d="M 500 430 Q 500 340 495 285" fill="none" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity="0.85"/>
+                            <g transform="translate(495, 285) rotate(-5)">
+                                <ellipse cx="0" cy="0" rx="16" ry="6" fill="url(#antherGrad)" filter="url(#shadowFilter)"/>
+                                <path d="M -12 0 C -6 -4 6 -4 12 0 C 6 4 -6 4 -12 0 Z" fill="#ffea9f" opacity="0.95"/>
+                                <circle cx="-4" cy="2" r="1.2" fill="#fff" opacity="0.9"/>
+                                <circle cx="6" cy="-2" r="1" fill="#ffd54f" opacity="0.8"/>
+                            </g>
+                        </g>
+
+                        <!-- Stamen 4: Mid Right -->
+                        <g class="stamen stamen-4">
+                            <path d="M 500 430 Q 530 360 565 310" fill="none" stroke="url(#stamenGrad)" stroke-width="3.2" stroke-linecap="round"/>
+                            <path d="M 500 430 Q 530 360 565 310" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+                            <g transform="translate(565, 310) rotate(-25)">
+                                <ellipse cx="0" cy="0" rx="15" ry="5.5" fill="url(#antherGrad)" filter="url(#shadowFilter)"/>
+                                <path d="M -11 0 C -5 -3.5 5 -3.5 11 0 C 5 3.5 -5 3.5 -11 0 Z" fill="#ffea9f" opacity="0.9"/>
+                                <circle cx="-2" cy="3" r="1" fill="#fff" opacity="0.8"/>
+                                <circle cx="4" cy="-3" r="1.1" fill="#ffd54f" opacity="0.9"/>
+                            </g>
+                        </g>
+
+                        <!-- Stamen 5: Far Right -->
+                        <g class="stamen stamen-5">
+                            <path d="M 500 430 Q 550 380 610 345" fill="none" stroke="url(#stamenGrad)" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M 500 430 Q 550 380 610 345" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+                            <g transform="translate(610, 345) rotate(30)">
+                                <ellipse cx="0" cy="0" rx="14" ry="5" fill="url(#antherGrad)" filter="url(#shadowFilter)"/>
+                                <path d="M -10 0 C -5 -3 5 -3 10 0 C 5 3 -5 3 -10 0 Z" fill="#ffea9f" opacity="0.9"/>
+                                <circle cx="2" cy="-2" r="1.2" fill="#ffd54f" opacity="0.9"/>
+                            </g>
+                        </g>
+
+                        <!-- PISTIL (Central Female Organ - Longer, thicker, 3-lobed stigma) -->
+                        <g class="pistil">
+                            <!-- Style Tube -->
+                            <path d="M 500 430 Q 480 340 460 265" fill="none" stroke="#7aa644" stroke-width="5.5" stroke-linecap="round"/>
+                            <path d="M 500 430 Q 480 340 460 265" fill="none" stroke="#cbeb96" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>
+                            
+                            <!-- 3-Lobed Stigma Knob at Tip -->
+                            <g transform="translate(460, 265)">
+                                <circle cx="-3" cy="-3" r="5.5" fill="url(#stigmaGrad)"/>
+                                <circle cx="4" cy="-2" r="5" fill="url(#stigmaGrad)"/>
+                                <circle cx="0" cy="4" r="5" fill="url(#stigmaGrad)"/>
+                                <!-- Wet Sticky Highlight -->
+                                <circle cx="-2" cy="-3" r="1.8" fill="#eaf7d3" opacity="0.75"/>
+                            </g>
+                        </g>
+
+                    </g> <!-- End Reproductive Organs -->
+
+                </g> <!-- End Flower Head Sway Group -->
+            </g> <!-- End Master Sway Group -->
+
+        </svg>
+
+        <!-- Click to Replay Invisible Overlay Trigger -->
+        <div class="replay-trigger" id="replayBtn" title="Click to replay animation"></div>
+        <div class="hint" id="hintText">Click anywhere to replay</div>
+    </div>
+
+    <!-- ==========================================
+         JAVASCRIPT: PROCEDURAL PARTICLES & REPLAY
+         ========================================== -->
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            /* ----------------------------------------------------
+               1. PROCEDURAL FLOATING DUST & POLLEN PARTICLES
+               ---------------------------------------------------- */
+            const canvas = document.getElementById("particleCanvas");
+            const ctx = canvas.getContext("2d");
+
+            let width = (canvas.width = window.innerWidth);
+            let height = (canvas.height = window.innerHeight);
+
+            window.addEventListener("resize", () => {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            });
+
+            const PARTICLE_COUNT = 45;
+            const particles = [];
+
+            class Particle {
+                constructor() {
+                    this.reset(true);
+                }
+
+                reset(initial = false) {
+                    this.x = Math.random() * width;
+                    this.y = initial ? Math.random() * height : height + 20;
+                    this.radius = Math.random() * 1.8 + 0.4;
+                    // Soft warm gold/pinkish pollen tone
+                    const colors = [
+                        "rgba(255, 240, 200, ",
+                        "rgba(255, 210, 230, ",
+                        "rgba(240, 255, 210, ",
+                        "rgba(255, 255, 255, "
+                    ];
+                    this.colorBase = colors[Math.floor(Math.random() * colors.length)];
+                    this.alpha = Math.random() * 0.5 + 0.15;
+                    this.speedY = -(Math.random() * 0.4 + 0.15);
+                    this.speedX = Math.random() * 0.3 - 0.15;
+                    this.pulseSpeed = Math.random() * 0.02 + 0.005;
+                    this.pulseAngle = Math.random() * Math.PI * 2;
+                }
+
+                update() {
+                    this.y += this.speedY;
+                    this.x += this.speedX + Math.sin(this.pulseAngle) * 0.2;
+                    this.pulseAngle += this.pulseSpeed;
+
+                    // Fade out near top boundary
+                    if (this.y < -10) {
+                        this.reset(false);
+                    }
+                }
+
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    const currentAlpha = Math.max(0, this.alpha + Math.sin(this.pulseAngle) * 0.1);
+                    ctx.fillStyle = this.colorBase + currentAlpha + ")";
+                    ctx.shadowBlur = 6;
+                    ctx.shadowColor = "rgba(255, 220, 180, 0.4)";
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                particles.push(new Particle());
+            }
+
+            function animateParticles() {
+                ctx.clearRect(0, 0, width, height);
+                particles.forEach((p) => {
+                    p.update();
+                    p.draw();
+                });
+                requestAnimationFrame(animateParticles);
+            }
+
+            animateParticles();
+
+            /* ----------------------------------------------------
+               2. REPLAY ANIMATION FUNCTIONALITY
+               ---------------------------------------------------- */
+            const replayBtn = document.getElementById("replayBtn");
+            const container = document.getElementById("flowerContainer");
+            const hintText = document.getElementById("hintText");
+
+            // Hide hint after 6 seconds
+            setTimeout(() => {
+                hintText.style.opacity = "0";
+            }, 7000);
+
+            replayBtn.addEventListener("click", () => {
+                // Force DOM reflow to restart CSS animations seamlessly
+                const svg = container.querySelector("svg");
+                svg.style.display = "none";
+                svg.offsetHeight; // Trigger reflow
+                svg.style.display = "block";
+
+                // Briefly show hint again
+                hintText.style.opacity = "0.6";
+                setTimeout(() => {
+                    hintText.style.opacity = "0";
+                }, 4000);
+            });
+        });
+    </script>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+</body>
+</html>
